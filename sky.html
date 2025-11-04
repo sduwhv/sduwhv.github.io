@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>🌌 Sky Rider: Infinite Flight</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: radial-gradient(circle at top, #0d1b2a, #000);
+    overflow: hidden;
+    font-family: 'Segoe UI', sans-serif;
+    color: #fff;
+    text-align: center;
+  }
+  h1 {
+    margin-top: 10px;
+    text-shadow: 0 0 12px #00ffff;
+  }
+  canvas {
+    background: linear-gradient(to bottom, #000010, #001133);
+    display: block;
+    margin: 20px auto;
+    border: 3px solid #00ffff;
+    border-radius: 15px;
+  }
+  #score {
+    font-size: 1.5em;
+    margin-top: 5px;
+    text-shadow: 0 0 8px cyan;
+  }
+</style>
+</head>
+<body>
+<h1>🌌 Sky Rider: Infinite Flight</h1>
+<canvas id="gameCanvas" width="800" height="450"></canvas>
+<div id="score">Score: 0</div>
+
+<script>
+// Setup
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+
+let player = { x: 100, y: 200, r: 15, dy: 0 };
+let gravity = 0.3;
+let lift = -7;
+let meteors = [];
+let particles = [];
+let stars = [];
+let score = 0;
+let speed = 4;
+let gameOver = false;
+
+// Sounds
+const flapSound = new Audio("https://cdn.pixabay.com/download/audio/2021/09/20/audio_9561c8f70b.mp3?filename=jump-1-8113.mp3");
+const hitSound = new Audio("https://cdn.pixabay.com/download/audio/2022/03/15/audio_288b302fd4.mp3?filename=hit-3-89705.mp3");
+const bgMusic = new Audio("https://cdn.pixabay.com/download/audio/2023/06/14/audio_39e5794d7f.mp3?filename=game-music-loop-141081.mp3");
+bgMusic.loop = true;
+bgMusic.volume = 0.4;
+bgMusic.play();
+
+// Controls
+document.addEventListener("keydown", e => {
+  if (e.code === "Space") {
+    player.dy = lift;
+    flapSound.currentTime = 0;
+    flapSound.play();
+  }
+});
+
+// Generate background stars
+for (let i = 0; i < 100; i++) {
+  stars.push({
+    x: Math.random() * canvas.width,
+    y: Math.random() * canvas.height,
+    size: Math.random() * 2,
+    speed: Math.random() * 0.5 + 0.2
+  });
+}
+
+// Generate meteors
+function spawnMeteor() {
+  if (Math.random() < 0.03) {
+    meteors.push({
+      x: canvas.width + 20,
+      y: Math.random() * canvas.height,
+      r: 10 + Math.random() * 20,
+      dx: speed + Math.random() * 3
+    });
+  }
+}
+
+// Draw stars with parallax
+function drawStars() {
+  ctx.fillStyle = "white";
+  stars.forEach(s => {
+    ctx.fillRect(s.x, s.y, s.size, s.size);
+    s.x -= s.speed;
+    if (s.x < 0) s.x = canvas.width;
+  });
+}
+
+// Draw player (glowing ship)
+function drawPlayer() {
+  const grad = ctx.createRadialGradient(player.x, player.y, 5, player.x, player.y, 30);
+  grad.addColorStop(0, "#00ffff");
+  grad.addColorStop(1, "#001133");
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(player.x, player.y, player.r, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Tail flame particles
+  particles.push({ x: player.x - 20, y: player.y, size: Math.random() * 3, alpha: 1 });
+}
+
+// Draw and update particles
+function drawParticles() {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    ctx.fillStyle = `rgba(0,255,255,${p.alpha})`;
+    ctx.fillRect(p.x, p.y, p.size, p.size);
+    p.x -= 2;
+    p.alpha -= 0.02;
+    if (p.alpha <= 0) particles.splice(i, 1);
+  }
+}
+
+// Draw meteors
+function drawMeteors() {
+  ctx.fillStyle = "#ff5555";
+  meteors.forEach(m => {
+    ctx.beginPath();
+    ctx.arc(m.x, m.y, m.r, 0, Math.PI * 2);
+    ctx.fill();
+  });
+}
+
+// Update meteors
+function updateMeteors() {
+  meteors.forEach(m => m.x -= m.dx);
+  meteors = meteors.filter(m => m.x + m.r > 0);
+}
+
+// Collision detection
+function checkCollision() {
+  for (let m of meteors) {
+    let dx = player.x - m.x;
+    let dy = player.y - m.y;
+    if (Math.sqrt(dx * dx + dy * dy) < player.r + m.r) {
+      hitSound.play();
+      bgMusic.pause();
+      gameOver = true;
+      setTimeout(() => {
+        alert("💀 Game Over! Your Score: " + score);
+        document.location.reload();
+      }, 100);
+    }
+  }
+}
+
+// Game loop
+function loop() {
+  if (gameOver) return;
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  drawStars();
+  drawMeteors();
+  drawParticles();
+  drawPlayer();
+
+  player.dy += gravity;
+  player.y += player.dy;
+
+  if (player.y + player.r > canvas.height) {
+    player.y = canvas.height - player.r;
+    player.dy = 0;
+  }
+  if (player.y - player.r < 0) {
+    player.y = player.r;
+    player.dy = 0;
+  }
+
+  spawnMeteor();
+  updateMeteors();
+  checkCollision();
+
+  score++;
+  document.getElementById("score").innerText = "Score: " + score;
+
+  requestAnimationFrame(loop);
+}
+
+loop();
+</script>
+</body>
+</html>
